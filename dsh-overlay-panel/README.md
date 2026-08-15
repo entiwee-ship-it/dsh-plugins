@@ -1,9 +1,19 @@
 # dsh-overlay-panel
 
-DSH Web 的自有界面插件：悬浮工具面板「工具坞」——全站 token 统计。
+DSH Web 的自有界面插件：悬浮工具面板「工具坞」——多视图（token 统计 / 插件列表）。
 设计上下文见同目录 `PRODUCT.md`（impeccable 流程产出）。
 
-## 面板能力（v1.0）
+## 视图切换
+
+头部标题右侧的图标按钮在两个视图间切换，当前视图持久化到
+`localStorage["dsh-overlay-panel.view"]`：
+
+- **token 统计**（默认）：见下节；
+- **插件列表**：组合插件清单（`remote.pluginInventory`，entryId / 启用态 /
+  Fiber 阶段徽章，失败置顶、禁用沉底）+ 本进程动态插件清单
+  （`remote.dynamicCordisRunner`，版本数 / 运行状态），顶栏刷新按钮手动重拉。
+
+## 面板能力（token 统计 v1.0）
 
 - **时间维度**：今日 / 本周 / 本月 / 累计，默认今日；tab 行右侧展示当前维度覆盖的
   数据日期范围（累计取全部会话中最早有记录的一天）。

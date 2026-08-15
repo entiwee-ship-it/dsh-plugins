@@ -11,7 +11,8 @@
  * 左上角），因此关闭面板时收缩动画的终点就是 FAB 出现的位置，不会跳变；
  * 贴边打开再收起，FAB 回到原处。
  *
- * 内容：全站 token 统计。数据源是客户端运行时会话列表
+ * 内容：多视图工具面板，头部按钮切换——
+ * ① token 统计（默认）：全站 token 用量。数据源是客户端运行时会话列表
  * （ctx.get("sessions").list，SnapshotStore 快照订阅），逐行读取宿主投影的
  * tokenUsage（提供方回报的输入/输出/缓存读/缓存写累计）与 sessionStats
  * （轮/步数）。会话排行按 ctx.get("workspaces").list 的工作区视图分组：
@@ -25,6 +26,9 @@
  * （自启用起累积，localStorage 键 .usageDaily，保留 14 天）。
  * 累计维度为宿主 tokenUsage 投影原值。默认维度为今日；维度标签下方
  * 展示当前统计覆盖的数据日期范围。
+ * ② 插件列表：宿主组合插件清单（remote.pluginInventory，entryId/启用态/
+ * Fiber 阶段）与本进程动态插件清单（remote.dynamicCordisRunner，包版本与
+ * 运行状态），进入视图时懒加载，可手动刷新。
  *
  * client-hmr stat-poll 本文件，保存即热重载（清理逻辑见 apply 返回的 disposer）。
  */
@@ -44,6 +48,7 @@ window.__ModuleLoader__.load({
 		const K_PANEL_LEGACY = "dsh-overlay-panel.panelPos";
 		const K_DAILY = "dsh-overlay-panel.usageDaily";
 		const K_COLLAPSED = "dsh-overlay-panel.collapsed";
+		const K_VIEW = "dsh-overlay-panel.view";
 		const FAB_SIZE = 44;
 		const PANEL_W = 380;
 		const PANEL_H_EST = 480;
@@ -190,6 +195,36 @@ window.__ModuleLoader__.load({
 .dop-group-body { padding: 0 0 2px 12px; animation: dopFadeIn 150ms ease-out; }
 
 .dop-footer { flex: none; margin: 0; padding: 8px 14px 12px; font-size: 11.5px; color: oklch(0.55 0.03 260); }
+
+.dop-view-toggle {
+	width: 28px; height: 28px; border: none; border-radius: 8px; background: transparent;
+	color: oklch(0.52 0.03 260); cursor: pointer; flex: none;
+	display: flex; align-items: center; justify-content: center;
+	transition: background 120ms ease-out, color 120ms ease-out;
+}
+.dop-view-toggle:hover { background: oklch(0.95 0.02 260); color: oklch(0.40 0.10 260); }
+.dop-view-toggle:focus-visible { outline: 2px solid oklch(0.60 0.17 260); outline-offset: -2px; }
+
+.dop-plugin-topbar { flex: none; display: flex; align-items: center; padding: 12px 14px 6px; }
+.dop-plugin-topbar .dop-section-label { padding: 0; margin: 0; flex: 1; }
+.dop-refresh {
+	width: 24px; height: 24px; border: none; border-radius: 7px; background: transparent;
+	color: oklch(0.55 0.03 260); cursor: pointer; flex: none;
+	display: flex; align-items: center; justify-content: center;
+	transition: background 120ms ease-out, color 120ms ease-out;
+}
+.dop-refresh:hover { background: oklch(0.95 0.02 260); color: oklch(0.40 0.10 260); }
+.dop-refresh:focus-visible { outline: 2px solid oklch(0.60 0.17 260); outline-offset: -2px; }
+
+.dop-plugin-subhead { font-size: 11px; font-weight: 600; color: oklch(0.50 0.03 260); margin: 8px 0 3px; }
+.dop-plugin-subhead:first-child { margin-top: 0; }
+.dop-plugin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.dop-plugin-meta { flex: none; font-size: 11px; color: oklch(0.60 0.03 260); font-variant-numeric: tabular-nums; }
+.dop-phase { flex: none; font-size: 10px; line-height: 16px; padding: 0 6px; border-radius: 999px; font-weight: 600; }
+.dop-phase-active { background: oklch(0.93 0.04 165); color: oklch(0.42 0.10 165); }
+.dop-phase-failed { background: oklch(0.94 0.04 25); color: oklch(0.48 0.14 25); }
+.dop-phase-busy { background: oklch(0.94 0.05 80); color: oklch(0.48 0.11 80); }
+.dop-phase-off { background: oklch(0.94 0.01 260); color: oklch(0.55 0.02 260); }
 .dop-empty { margin: 4px 14px 10px; font-size: 12px; color: oklch(0.55 0.03 260); }
 
 @media (prefers-color-scheme: dark) {
@@ -228,6 +263,16 @@ window.__ModuleLoader__.load({
 	.dop-chev { color: oklch(0.60 0.02 260); }
 	.dop-group-meta { color: oklch(0.60 0.02 260); }
 	.dop-footer, .dop-empty { color: oklch(0.60 0.02 260); }
+	.dop-view-toggle { color: oklch(0.70 0.02 260); }
+	.dop-view-toggle:hover { background: oklch(0.32 0.03 260); color: oklch(0.90 0.02 260); }
+	.dop-refresh { color: oklch(0.65 0.02 260); }
+	.dop-refresh:hover { background: oklch(0.32 0.03 260); color: oklch(0.90 0.02 260); }
+	.dop-plugin-subhead { color: oklch(0.65 0.02 260); }
+	.dop-plugin-meta { color: oklch(0.60 0.02 260); }
+	.dop-phase-active { background: oklch(0.32 0.05 165); color: oklch(0.80 0.10 165); }
+	.dop-phase-failed { background: oklch(0.34 0.05 25); color: oklch(0.80 0.10 25); }
+	.dop-phase-busy { background: oklch(0.34 0.05 80); color: oklch(0.80 0.10 80); }
+	.dop-phase-off { background: oklch(0.32 0.02 260); color: oklch(0.65 0.02 260); }
 	.dop-rank-scroll { scrollbar-color: oklch(0.48 0.03 260 / 0.55) transparent; }
 	.dop-rank-scroll::-webkit-scrollbar-thumb { background: oklch(0.48 0.03 260 / 0.55); }
 	.dop-rank-scroll:hover::-webkit-scrollbar-thumb { background: oklch(0.58 0.04 260 / 0.75); }
@@ -679,6 +724,137 @@ window.__ModuleLoader__.load({
 			);
 		}
 
+		/** lucide 风格 layout-grid：切到插件列表视图。 */
+		function GridIcon() {
+			return h("svg", { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+				h("rect", { x: 3, y: 3, width: 7, height: 7, rx: 1 }),
+				h("rect", { x: 14, y: 3, width: 7, height: 7, rx: 1 }),
+				h("rect", { x: 14, y: 14, width: 7, height: 7, rx: 1 }),
+				h("rect", { x: 3, y: 14, width: 7, height: 7, rx: 1 })
+			);
+		}
+		/** lucide 风格 bar-chart：切回 token 统计视图。 */
+		function ChartIcon() {
+			return h("svg", { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+				h("line", { x1: 6, y1: 20, x2: 6, y2: 16 }),
+				h("line", { x1: 12, y1: 20, x2: 12, y2: 10 }),
+				h("line", { x1: 18, y1: 20, x2: 18, y2: 4 })
+			);
+		}
+		/** lucide 风格 rotate-cw：刷新插件清单。 */
+		function RefreshIcon() {
+			return h("svg", { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+				h("polyline", { points: "23 4 23 10 17 10" }),
+				h("path", { d: "M20.49 15a9 9 0 1 1-2.12-9.36L23 10" })
+			);
+		}
+
+		/** 组合插件 Fiber 阶段 → 徽章文案与样式。 */
+		function phaseBadgeOf(phase, enabled) {
+			if (!enabled) return { label: "已禁用", cls: "dop-phase-off" };
+			switch (phase) {
+				case "active": return { label: "运行中", cls: "dop-phase-active" };
+				case "failed": return { label: "失败", cls: "dop-phase-failed" };
+				case "pending":
+				case "loading": return { label: "加载中", cls: "dop-phase-busy" };
+				case "unloading": return { label: "卸载中", cls: "dop-phase-off" };
+				default: return { label: "未加载", cls: "dop-phase-off" };
+			}
+		}
+		/** 动态插件运行状态 → 徽章文案与样式。 */
+		function dynamicBadgeOf(row) {
+			if (row.activeRun) return { label: "运行中", cls: "dop-phase-active" };
+			if (row.currentPackageId) return { label: "已停止", cls: "dop-phase-off" };
+			return { label: "未运行", cls: "dop-phase-off" };
+		}
+
+		/**
+		 * 插件列表视图：宿主组合插件（pluginInventory Remote）+ 本进程动态插件
+		 * （dynamicCordisRunner Remote）。两个 Remote 都只表示调用当下，进入视图
+		 * 懒加载，顶栏刷新按钮手动重拉。
+		 */
+		function PluginListView(props) {
+			const [tick, setTick] = useState(0);
+			const [state, setState] = useState({ phase: "loading", error: null, staticEntries: [], dynamicRows: [] });
+			useEffect(() => {
+				let alive = true;
+				setState((s) => ({ ...s, phase: "loading" }));
+				(async () => {
+					const out = { staticEntries: [], dynamicRows: [], errors: [] };
+					if (props.pluginInventory) {
+						try {
+							const result = await props.pluginInventory.list();
+							if (result.ok) out.staticEntries = result.value?.entries ?? [];
+							else out.errors.push(`组合插件：${result.error?.code ?? "调用失败"}`);
+						} catch (e) {
+							out.errors.push(`组合插件：${String(e)}`);
+						}
+					} else out.errors.push("组合插件清单服务不可用");
+					if (props.dynamicRunner) {
+						try {
+							const result = await props.dynamicRunner.inventory();
+							if (result.ok) out.dynamicRows = result.value ?? [];
+							else out.errors.push(`动态插件：${result.error?.code ?? "调用失败"}`);
+						} catch (e) {
+							out.errors.push(`动态插件：${String(e)}`);
+						}
+					}
+					if (alive) setState({ phase: "ready", error: out.errors.join("；") || null, staticEntries: out.staticEntries, dynamicRows: out.dynamicRows });
+				})();
+				return () => { alive = false; };
+			}, [tick, props.pluginInventory, props.dynamicRunner]);
+
+			// 失败优先，其次保持 Loader 顺序（sort 稳定）；已禁用沉底。
+			const staticEntries = useMemo(() => {
+				const weight = (e) => (e.fiberPhase === "failed" ? 0 : e.enabled === false ? 2 : 1);
+				return [...state.staticEntries].sort((a, b) => weight(a) - weight(b));
+			}, [state.staticEntries]);
+
+			return h(React.Fragment, null,
+				h("div", { className: "dop-plugin-topbar" },
+					h("p", { className: "dop-section-label" }, "插件列表"),
+					h("button", {
+						type: "button",
+						className: "dop-refresh",
+						title: "刷新清单",
+						"aria-label": "刷新插件清单",
+						onClick: () => setTick((t) => t + 1)
+					}, h(RefreshIcon))
+				),
+				h("div", { className: "dop-rank-scroll" },
+					state.phase === "loading" && state.staticEntries.length === 0
+						? h("p", { className: "dop-desc", style: { margin: "0" } }, "正在读取插件清单…")
+						: h(React.Fragment, null,
+							state.error ? h("p", { className: "dop-empty", style: { margin: "0 0 8px" } }, state.error) : null,
+							h("p", { className: "dop-plugin-subhead" }, `组合插件 ${staticEntries.length}`),
+							staticEntries.map((e) => {
+								const badge = phaseBadgeOf(e.fiberPhase, e.enabled);
+								return h("div", { className: "dop-session", key: e.entryId, title: e.moduleName },
+									h("span", { className: "dop-plugin-name" }, e.entryId),
+									h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
+								);
+							}),
+							h("p", { className: "dop-plugin-subhead" }, `动态插件 ${state.dynamicRows.length}`),
+							state.dynamicRows.length === 0
+								? h("p", { className: "dop-empty", style: { margin: "0" } }, "当前进程没有动态插件。")
+								: state.dynamicRows.map((row) => {
+									const badge = dynamicBadgeOf(row);
+									return h("div", {
+										className: "dop-session",
+										key: row.pluginId,
+										title: `所属会话 ${row.agentId}\n当前版本 ${row.currentPackageId ?? "—"}`
+									},
+										h("span", { className: "dop-plugin-name" }, row.pluginId),
+										h("span", { className: "dop-plugin-meta" }, `${row.packages.length} 个版本`),
+										h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
+									);
+								})
+						)
+				),
+				h("p", { className: "dop-footer" }, `${staticEntries.length} 个组合插件 · ${state.dynamicRows.length} 个动态插件`)
+			);
+		}
+
 		/** 单条会话排行行：点击打开主会话；状态点 + 标题 + 子代理徽标 + 命中率 + token 总量。 */
 		function SessionRankRow(props) {
 			const { row, v, own, subs, onOpen, current } = props;
@@ -916,6 +1092,9 @@ window.__ModuleLoader__.load({
 		function OverlayPanelApp(props) {
 			const [open, setOpen] = useState(() => readJSON(K_OPEN, false));
 			const [closing, setClosing] = useState(false);
+			// 当前视图：stats（token 统计）/ plugins（插件列表），持久化。
+			const [view, setView] = useState(() => readJSON(K_VIEW, "stats"));
+			useEffect(() => writeJSON(K_VIEW, view), [view]);
 			// 锚点永远属于 FAB：FAB 拖动时跟随 FAB，面板拖动时跟随面板；
 			// 仅打开/收起不改写它——贴边打开后收起，FAB 回到原处。
 			const [anchor, setAnchor] = useState(readPos);
@@ -1035,6 +1214,14 @@ window.__ModuleLoader__.load({
 					h("span", { className: "dop-grip" }, h(GripIcon)),
 					h("span", { className: "dop-title" }, "工具坞"),
 					h("button", {
+						className: "dop-view-toggle",
+						type: "button",
+						title: view === "stats" ? "切换到插件列表" : "切换到 token 统计",
+						"aria-label": view === "stats" ? "切换到插件列表" : "切换到 token 统计",
+						onPointerDown: (e) => e.stopPropagation(),
+						onClick: () => setView((v) => (v === "stats" ? "plugins" : "stats"))
+					}, view === "stats" ? h(GridIcon) : h(ChartIcon)),
+					h("button", {
 						className: "dop-close",
 						type: "button",
 						title: "收起面板",
@@ -1044,11 +1231,16 @@ window.__ModuleLoader__.load({
 					}, h(CloseIcon))
 				),
 				h("div", { className: "dop-body" },
-					h(TokenStatsView, {
-						store: props.sessionStore,
-						workspaceStore: props.workspaceStore,
-						sessionActions: props.sessionActions
-					})
+					view === "stats"
+						? h(TokenStatsView, {
+							store: props.sessionStore,
+							workspaceStore: props.workspaceStore,
+							sessionActions: props.sessionActions
+						})
+						: h(PluginListView, {
+							pluginInventory: props.pluginInventory,
+							dynamicRunner: props.dynamicRunner
+						})
 				)
 			);
 		}
@@ -1066,7 +1258,9 @@ window.__ModuleLoader__.load({
 				root.render(h(OverlayPanelApp, {
 					sessionStore: sessions?.list ?? null,
 					workspaceStore: workspaces?.list ?? null,
-					sessionActions: sessions ?? null
+					sessionActions: sessions ?? null,
+					pluginInventory: ctx.get("remote.pluginInventory") ?? null,
+					dynamicRunner: ctx.get("remote.dynamicCordisRunner") ?? null
 				}));
 				return () => {
 					root.unmount();
