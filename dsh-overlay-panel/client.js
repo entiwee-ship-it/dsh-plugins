@@ -601,6 +601,7 @@ window.__ModuleLoader__.load({
 		const K_PANEL_LEGACY = "dsh-overlay-panel.panelPos";
 		const K_DAILY = "dsh-overlay-panel.usageDaily";
 		const K_COLLAPSED = "dsh-overlay-panel.collapsed";
+		const K_PLUGIN_COLLAPSED = "dsh-overlay-panel.pluginCollapsed";
 		const K_VIEW = "dsh-overlay-panel.view";
 		const FAB_SIZE = 44;
 		const PANEL_W = 380;
@@ -769,8 +770,6 @@ window.__ModuleLoader__.load({
 .dop-refresh:hover { background: oklch(0.95 0.02 260); color: oklch(0.40 0.10 260); }
 .dop-refresh:focus-visible { outline: 2px solid oklch(0.60 0.17 260); outline-offset: -2px; }
 
-.dop-plugin-subhead { font-size: 11px; font-weight: 600; color: oklch(0.50 0.03 260); margin: 8px 0 3px; }
-.dop-plugin-subhead:first-child { margin-top: 0; }
 .dop-plugin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
 .dop-plugin-meta { flex: none; font-size: 11px; color: oklch(0.60 0.03 260); font-variant-numeric: tabular-nums; }
 .dop-phase { flex: none; font-size: 10px; line-height: 16px; padding: 0 6px; border-radius: 999px; font-weight: 600; }
@@ -834,7 +833,6 @@ window.__ModuleLoader__.load({
 	.dop-view-toggle:hover { background: oklch(0.32 0.03 260); color: oklch(0.90 0.02 260); }
 	.dop-refresh { color: oklch(0.65 0.02 260); }
 	.dop-refresh:hover { background: oklch(0.32 0.03 260); color: oklch(0.90 0.02 260); }
-	.dop-plugin-subhead { color: oklch(0.65 0.02 260); }
 	.dop-plugin-meta { color: oklch(0.60 0.02 260); }
 	.dop-phase-active { background: oklch(0.32 0.05 165); color: oklch(0.80 0.10 165); }
 	.dop-phase-failed { background: oklch(0.34 0.05 25); color: oklch(0.80 0.10 25); }
@@ -1402,6 +1400,17 @@ window.__ModuleLoader__.load({
 			const [tick, setTick] = useState(0);
 			const [state, setState] = useState({ phase: "loading", error: null, staticEntries: [], dynamicRows: [] });
 			const [query, setQuery] = useState("");
+			// 分区收缩状态（持久化）：出厂组合/已禁用默认收起，失败/本机自加/动态插件默认展开。
+			const SECTION_DEFAULTS = { failed: false, disabled: true, user: false, base: true, dynamic: false };
+			const [collapsedSections, setCollapsedSections] = useState(() => readJSON(K_PLUGIN_COLLAPSED, {}));
+			const isSectionCollapsed = (key) => collapsedSections[key] ?? SECTION_DEFAULTS[key] ?? false;
+			const toggleSection = (key) => {
+				setCollapsedSections((prev) => {
+					const next = { ...prev, [key]: !isSectionCollapsed(key) };
+					writeJSON(K_PLUGIN_COLLAPSED, next);
+					return next;
+				});
+			};
 			const [expanded, setExpanded] = useState(() => new Set());
 			const toggleExpanded = (id) => {
 				setExpanded((prev) => {
@@ -1457,18 +1466,43 @@ window.__ModuleLoader__.load({
 			const baseRows = visible.filter((e) => !isSpecial(e) && sourceOf(e.entryId).kind !== "user");
 			const dynamicRows = state.dynamicRows.filter((r) => !q || r.pluginId.toLowerCase().includes(q));
 
-			const renderSection = (title, rows) =>
-				rows.length === 0
-					? null
-					: h(React.Fragment, null,
-						h("p", { className: "dop-plugin-subhead" }, `${title} ${rows.length}`),
-						rows.map((e) => h(PluginRow, {
-							key: e.entryId,
-							entry: e,
-							expanded: expanded.has(e.entryId),
-							onToggle: () => toggleExpanded(e.entryId)
-						}))
-					);
+			// 分区渲染：可收缩组头（chevron + 标题 + 数量）；过滤时强制展开以露出匹配项。
+			const renderSection = (title, rows, key, renderRow) => {
+				if (rows.length === 0) return null;
+				const collapsed = q ? false : isSectionCollapsed(key);
+				return h("div", { className: "dop-group", key },
+					h("button", {
+						type: "button",
+						className: "dop-group-header",
+						"aria-expanded": String(!collapsed),
+						title: collapsed ? `展开 ${title}` : `收起 ${title}`,
+						onClick: () => toggleSection(key)
+					},
+						h("span", { className: "dop-chev" + (collapsed ? "" : " dop-chev-open") }, h(ChevronIcon)),
+						h("span", { className: "dop-group-title" }, title),
+						h("span", { className: "dop-group-meta" }, `${rows.length} 个`)
+					),
+					collapsed ? null : h("div", { className: "dop-group-body" }, rows.map(renderRow))
+				);
+			};
+			const renderStaticRow = (e) => h(PluginRow, {
+				key: e.entryId,
+				entry: e,
+				expanded: expanded.has(e.entryId),
+				onToggle: () => toggleExpanded(e.entryId)
+			});
+			const renderDynamicRow = (row) => {
+				const badge = dynamicBadgeOf(row);
+				return h("div", {
+					className: "dop-session",
+					key: row.pluginId,
+					title: `所属会话 ${row.agentId}\n当前版本 ${row.currentPackageId ?? "—"}`
+				},
+					h("span", { className: "dop-plugin-name" }, row.pluginId),
+					h("span", { className: "dop-plugin-meta" }, `${row.packages.length} 个版本`),
+					h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
+				);
+			};
 
 			return h(React.Fragment, null,
 				h("div", { className: "dop-plugin-topbar" },
@@ -1495,31 +1529,15 @@ window.__ModuleLoader__.load({
 						? h("p", { className: "dop-desc", style: { margin: "0" } }, "正在读取插件清单…")
 						: h(React.Fragment, null,
 							state.error ? h("p", { className: "dop-empty", style: { margin: "0 0 8px" } }, state.error) : null,
-							visible.length === 0
+							visible.length === 0 && dynamicRows.length === 0
 								? h("p", { className: "dop-empty", style: { margin: "0" } }, "没有匹配的插件。")
 								: h(React.Fragment, null,
-									renderSection("失败", failedRows),
-									renderSection("已禁用", disabledRows),
-									renderSection("本机自加", userRows),
-									renderSection("出厂组合", baseRows)
-								),
-							dynamicRows.length > 0
-								? h(React.Fragment, null,
-									h("p", { className: "dop-plugin-subhead" }, `动态插件 ${dynamicRows.length}`),
-									dynamicRows.map((row) => {
-										const badge = dynamicBadgeOf(row);
-										return h("div", {
-											className: "dop-session",
-											key: row.pluginId,
-											title: `所属会话 ${row.agentId}\n当前版本 ${row.currentPackageId ?? "—"}`
-										},
-											h("span", { className: "dop-plugin-name" }, row.pluginId),
-											h("span", { className: "dop-plugin-meta" }, `${row.packages.length} 个版本`),
-											h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
-										);
-									})
+									renderSection("失败", failedRows, "failed", renderStaticRow),
+									renderSection("已禁用", disabledRows, "disabled", renderStaticRow),
+									renderSection("本机自加", userRows, "user", renderStaticRow),
+									renderSection("出厂组合", baseRows, "base", renderStaticRow),
+									renderSection("动态插件", dynamicRows, "dynamic", renderDynamicRow)
 								)
-								: null
 						)
 				),
 				h("p", { className: "dop-footer" }, `${state.staticEntries.length} 个组合插件 · ${state.dynamicRows.length} 个动态插件`)
