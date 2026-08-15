@@ -9,9 +9,13 @@ DSH Web 的自有界面插件：悬浮工具面板「工具坞」——多视图
 `localStorage["dsh-overlay-panel.view"]`：
 
 - **token 统计**（默认）：见下节；
-- **插件列表**：组合插件清单（`remote.pluginInventory`，entryId / 启用态 /
-  Fiber 阶段徽章，失败置顶、禁用沉底）+ 本进程动态插件清单
-  （`remote.dynamicCordisRunner`，版本数 / 运行状态），顶栏刷新按钮手动重拉。
+- **插件列表**：组合插件清单（`remote.pluginInventory`）按 失败 / 已禁用 /
+  本机自加 / 出厂组合 分区，行可展开查看**用途简介、来源（精确到 bundle 层）、
+  能否关闭的建议**，顶栏支持按名称/模块/用途过滤；动态插件清单
+  （`remote.dynamicCordisRunner`，版本数 / 运行状态）紧随其后。
+  简介与可关闭性数据来自 `tools/gen-plugin-docs.cjs` 生成器（读取各包
+  README.zh.md 首段 + 规则分类），内联在 `client.js` 的 `PLUGIN_DOCS` 常量中；
+  **DSH 升级后需重跑生成器**（用法见脚本头注释）并重新内联。
 
 ## 面板能力（token 统计 v1.0）
 

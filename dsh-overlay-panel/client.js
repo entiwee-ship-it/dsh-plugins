@@ -42,6 +42,559 @@ window.__ModuleLoader__.load({
 		const h = React.createElement;
 		const { useState, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } = React;
 
+		/** 自动生成的插件说明数据（scripts 生成，勿手改；DSH 升级后重跑生成器）。
+		 * 键为 moduleName；d=中文简介，c=可关闭性（core/feature/user/unknown）。 */
+		const PLUGIN_DOCS = Object.freeze({
+			"cordis:include": {
+				"d": "批量挂载器：把出厂插件清单（dsh-base 基础层 + dsh-web-app Web 层）展开成 Loader 行。",
+				"c": "core"
+			},
+			"@deepseek-ai/cordis-plugin-timer": {
+				"d": "Cordis 定时器服务：可随插件生命周期自动回收的 timeout/interval/throttle/debounce。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-llm": {
+				"d": "提供方无关的 LLM（大语言模型）词汇与抽象服务。本包定义 agent loop（智能体循环）、会话日志和所有插件共同使用的规范词汇。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-session": {
+				"d": "事件溯源的会话日志和内存存储。Session 是 agent（智能体）全部交互历史的仅追加真源，LLM（大语言模型）消息历史由它派生。原始日志之…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-typert-registry": {
+				"d": "生成的 Typert 产物所用的运行时注册表。每个注册项包含某个包在一个 face 上的业务反射信息，以及可选的运行时 Zod schema；c…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-typert-loader": {
+				"d": "生成的 Typert 产物所用的 Loader 集成，仅支持 Node。该插件需要 ctx.loader 和 ctx.typert；它本身不提供…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-api-gateway": {
+				"d": "为 Host 与 Client 两侧的 Cordis 环境提供 Typert RPC endpoint。Host 入口提供 ctx.typert…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-session-title": {
+				"d": "由日志支持的会话标题，提供即时确定性回退与一个可选异步提供方。每次已接受的修订都是仅写入日志的 session/title 事件；foldSes…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-title-first-prompt-llm": {
+				"d": "可选的 ctx.sessionTitle 提供方，通过 ctx.llm 总结第一条符合条件的用户消息。它注册 first-prompt 节奏，只…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-user-questions": {
+				"d": "用户交互 Service Definition。它定义 ctx.userQuestions，供面向模型的工具或权限插件在需要暂停工作并询问人类决…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-agent": {
+				"d": "Agent 接口、注册表、进程本地发起方作用域，以及 agent/ 事件词汇。每个插件（UI、钩子、编排器）都面向此处定义的 Agent han…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-agent-default-model": {
+				"d": "该部署默认值供入口在创建尚无会话级模型选择的 Agent 时使用。AgentDefaultModelConfig 提供 ctx.agentDef…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-jobs-local": {
+				"d": "maxConcurrentJobsPerOwner 必须是正的安全整数，默认值为 10。调用生产方之前，start() 会统计确切 owner …",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-llm-retry": {
+				"d": "一个函数插件，通过 agent loop（智能体循环）在已关闭步骤上触发的 agent/request-error waterfall（瀑布式事…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-settings-file": {
+				"d": "基于文件的设置提供方。一个 YAML 或 JSON 文档承载全部 namespace 分节；外部编辑经 ctx.settings 热发布，upd…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-credentials-local": {
+				"d": "文件型凭据提供方：四层来源，一套明确的优先级。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-llm-pi-ai": {
+				"d": "基于 @earendil-works/pi-ai 的 harness LLM（大语言模型）seam 通用多提供方适配器。一个插件实例拥有一份以路…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-persistence-jsonl": {
+				"d": "JSONL 持久会话存储后端：SessionPersistence 的一个具体实现（dsh-session-persistence seam）。…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-attachment-local": {
+				"d": "这是 @deepseek-ai/dsh-attachment 的私有本地实现。对象存放在 <DSH_HOME>/attachments/v1/o…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-query-sqlite": {
+				"d": "具体 ctx.sessionQuery 提供方。SqliteSessionQueryEngine 从 Service Definition 包继…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-projection": {
+				"d": "会话投影 Service Definition 与驱动注册表。它拥有 ctx.sessionProjections：该注册表在已提交的会话事件上…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-session-telemetry-otel": {
+				"d": "name: '@deepseek-ai/dsh-session-sessionTelemetry-otel'",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-subprocess-local": {
+				"d": "通过 Consumer 间接影响（目前是 dsh-tool-bash 背后的 bash 执行器家族）；进程输出与生命周期面向模型的全部渲染归 C…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-sandbox-local": {
+				"d": "包根目录导出默认及命名的 LocalSandboxProvider 插件和 Config；平台 profile builder 仍为内部实现。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-sandbox-policy": {
+				"d": "沙箱策略解析的唯一归属位置：部署默认 SandboxMode 与回退根目录，加上每个会话的持久模式覆盖和不可变工作区根目录。每项负责强制执行的能…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-pwsh-sandbox": {
+				"d": "沙盒消费型的 ctx.shell 执行器 seam 的 PowerShell 实现：每条命令以 pwsh -NoLogo -NoProfile …",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-user-approval": {
+				"d": "与通道无关的一次性审批 seam。ctx.approval.request(req) 返回 allowed-once、rejected、canc…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-permission-presets": {
+				"d": "通过 ctx.permissionPresets（PermissionPresetService）提供面向用户的权限预设。每个配置名称都会将 s…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-shell-env": {
+				"d": "工具无关的 shell 环境插件：拥有 ctx.shellEnv 注册表，管理受信任的、每次执行收集的 DSH_ 变量，供模型可见的 shell…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-fs-observation-policy": {
+				"d": "fs-observation-policy 插件：它记录观测到的存在或缺失状态，并在 ctx.fs 提供方约定（@deepseek-ai/dsh…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-skill": {
+				"d": "纯 agent skill（智能体技能）提供方注册表。",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-commands": {
+				"d": "由插件负责、供交互式 UI 适配器使用的面向用户命令注册表。插件命令注册 Agent Note定义了其边界与分发约定。",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-command-feedback": {
+				"d": "与触发方式无关的会话反馈，以及面向用户的 /feedback 采集。本包导出 recordFeedback(session, text)；该函数…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-goal": {
+				"d": "事件溯源的同会话目标状态。该服务在 agent（智能体）的现有会话中保留一个当前待完成目标，同时将继续执行的权限作为进程本地续行启用状态。goa…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-goal-round-driver": {
+				"d": "name: '@deepseek-ai/dsh-goal'",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-command-goal": {
+				"d": "面向用户的 /goal 控制，基于 ctx.goals 实现。该插件通过 ctx.commands 注册一个全局命令，因此每个已组合的命令适配器…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-token-meter": {
+				"d": "通过单例 ctx.tokenMeter 服务进行具备回放感知能力的 token 测量。它从持久日志为每个会话推进一个隔离 fold，因此压缩（c…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-subagent": {
+				"d": "subagent seam 允许一个 agent（智能体）通过具名提供方把工作委派给子 agent。调用方统一使用 ctx.subagents …",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-subagent-spawn-in-process": {
+				"d": "spawn 提供方会在当前进程中创建一个全新的子 Agent。子 agent（智能体）有自己的会话，看不到父 agent 的对话历史，并复用宿主…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-subagent-fork-in-process": {
+				"d": "fork 提供方会创建一个进程内子 agent（智能体），并以父 agent 已完成的对话轮次作为初始内容。它与 spawn 共用全部运行机制；…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-tool-subagent-report": {
+				"d": "可选的子级作用域 report 工具是 ctx.subagents.reportFrom() 之上的轻量适配器。它为每个可继续的进程内子级提供一…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-call-timeout-policy": {
+				"d": "工具调用超时强制执行器：单个 tools/execute 环绕分发监听器，会在 exec.signal 上设置单次调用的协作式截止时间；适用于声…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-spill-local": {
+				"d": "文件存放在 <root>/session-<hash>/​<random>-<safeName>：",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-spill-policy": {
+				"d": "工具结果 spill 策略：一个 tools/post-execute 转换器，用于防止过大的纯文本工具结果进入模型上下文。当最终结果超过 ma…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-checkpoint-policy": {
+				"d": "已持久化的 agent（智能体）的语义持久性策略。它会在模型适配器收到请求前、顶层工具正文可产生外部副作用前，以及每个 agent/pre-st…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-repeat-tool-reminder": {
+				"d": "这是一个仅提供建议的循环中断器，而非面向模型的工具：它不会出现在工具列表中，不会否决或改写调用，只增加一种行为。它监视每个 agent（智能体）…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-web": {
+				"d": "WebRuntime（ctx.web）定义 harness 具备哪些 web 访问能力（搜索 web、抓取 URL），并通过多个提供方实现，不把…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-web-search-deepseek": {
+				"d": "由 DeepSeek 支持的 WebSearchProvider，用于 harness web 能力 seam（ctx.web）。它调用 Dee…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tools": {
+				"d": "工具注册表与执行流水线。工具插件注册各自的 schema 和执行器；agent loop（智能体循环）依次让每次调用经过 tools/pre-e…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-system-prompt": {
+				"d": "系统提示词组装注册表。插件可以贡献有序段、工具 schema 和具名变量。循环在每个步骤组装一次，并将结果渲染为完整的模型提示词。此插件拥有静态…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-agent-loop": {
+				"d": "agent（智能体）的唯一具体实现插件和循环驱动器。其包内部实现满足 Agent 接口，并驱动会话、轮次和步骤的生命周期。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-fs-sandbox": {
+				"d": "SandboxedFileSystem 扩展 LocalFileSystem 并注册为 ctx.fs。它逐字继承全部文本存储机制（解析、stat…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-llm-deepseek": {
+				"d": "harness LLM（大语言模型）seam 的 DeepSeek chat-completions 适配器：直接 fetch + SSE（Se…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-code-runtime-worker-thread": {
+				"d": "这是 @deepseek-ai/dsh-code-runtime seam 的 worker 线程实现：WorkerThreadCodeRunt…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-storage": {
+				"d": "非会话数据的存储中心（ctx.storage）：具名后端注册表加已挂载的数据形式设施。中心自身不执行 IO：后端拥有介质，数据形式拥有语义。存储…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-storage-json": {
+				"d": "无。该后端不贡献提示词、工具或 schema；它在 ctx.storage 后面持久化非会话领域数据，只供宿主侧消费方使用。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-storage-domain": {
+				"d": "DeepSeek Harness 存储中心的领域数据形式：在所有已配置的后端注册后，公开可注入的 ctx.storageDomain 服务及对应…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-message-feedback": {
+				"d": "本包提供由 Host 拥有、针对单条已完成 assistant 消息的可编辑反馈。它注册 ctx.messageFeedback，在 stora…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-log-export": {
+				"d": "Web Session 日志下载控制，使用 dsh-host-apiproxy 拥有的 Host 流式 ZIP 端点。Host 半包注册 /ex…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-workspace": {
+				"d": "DeepSeek Harness 的 Workspace 实体注册表（ctx.workspaceRegistry）：通过领域数据形式存储持久 w…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-projection-cache": {
+				"d": "持久投影缓存（ctx.sessionProjectionCache）：把每个已注册投影单元的状态持久化为检查点，基于域数据形态（domain d…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-session-stats": {
+				"d": "注册 sessionStats projection 单元的函数插件：从步边界、流式 chunk、工具配对与已组装的 assistant 消息折…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-host-directory-picker-auto": {
+				"d": "判定是一次纯函数的启动时采样（resolveDirectoryPickerBackend），已导出供复用。native 要求“操作者看得到宿主屏…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-host-plugin-inventory": {
+				"d": "当前 Cordis Loader 树的只读 Host 投影。PluginInventoryGateway 注册 pluginInventory …",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-host-apiproxy": {
+				"d": "所有客户端共用的 API 网关由三部分组成：TypeScript API 约定（src/api/，不依赖 Node，可从浏览器导入）、fetch…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-cordis-host-runner": {
+				"d": "由模型挂载的动态包在 host 侧的那一半：定义注册表、host 半所用的 node:vm 沙箱与 fiber 生命周期、invoke hand…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-web-app/startup": {
+				"d": "dsh 浏览器表层组合包。cordis.patch.yml 叠加在 dsh-base 之上：设置 coding persona，插入 Web 宿…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-host-webserver": {
+				"d": "Web HTTP 与 upgrade route 注册插件（默认导出 WebServer，配置为 {host, port}）：一个在激活时开始监…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-web-app": {
+				"d": "Web 模式装配包：浏览器外壳、页面启动与 Web 传输层的组合入口。",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-client-hmr": {
+				"d": "为通过脚本加载的客户端插件提供热重载。web 组合包无条件挂载该行；没有重建 watcher（pnpm run dev:web）改写客户端 bu…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-modules": {
+				"d": "客户端模块系统：Node 内部 ESM loader 的浏览器端对等实现，以惰性 CJS 表实现。web 外壳挂载 vendored cordi…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-connection": {
+				"d": "协议消费层：客户端插件的 apply 会挂载 ctx.connection（共享 API 客户端 + 当前页面的 loopback 状态 + 可…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-api-remotes": {
+				"d": "为本应用选定的 Host Remote 能力提供双侧 BFF。Host 入口负责 Agent/Session 身份策略；Client 入口以运行…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-runtime": {
+				"d": "客户端 cordis 启动与不依赖 React 的对象服务：SlotRegistry 包装 SlotCore 并提供 renderer 数据源；…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-cordis-client-runner": {
+				"d": "动态双半插件包的浏览器半。host 侧 runner 把每个定义的代码留在进程内存里，并经一条 cordis/request-run 事件向打开…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-ui-theme": {
+				"d": "主题插件：基于 --dsw- token 基础样式表（静态尺度 + 别名语义层）的 ThemeRuntime。该服务拥有实时主题偏好（light…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-locale": {
+				"d": "locale 插件：LocaleRuntime——zh／en 偏好以 locale.preference 存储在 $DSH_HOME/setti…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-ui-layout": {
+				"d": "外壳插件：三栏 AppFrame（拖动手柄与让步链）加 ctx.layout 面板几何服务；它注册到运行时拥有的 root slot，并声明 s…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-ui-sidebar": {
+				"d": "侧边栏外壳插件：负责字标、New Session 操作、布局持有的折叠控件、可感知滚动的区域 seat，以及固定在底部的 Settings se…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-ui-settings": {
+				"d": "设置领域的底座，承担两项职责，本身不含任何呈现内容。它提供 ctx.settingsScope——每个偏好设置行绑定自己那份持久化命名空间分区所…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-settings-general": {
+				"d": "设置外壳、无特定功能归属文案与持久化产品引导 namespace。它以触发控件和模态设置面板占用 sidebar.settings，把 sett…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-settings-models": {
+				"d": "模型设置与产品引导插件。同一个 client Cordis 插件会注册 Models 页面和两个有序的首次使用弹窗：版本化内测声明，以及按条件显…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-settings-plugin-inventory": {
+				"d": "Web 设置中的只读插件列表标签页。浏览器插件注册一个 id 为 all 的本地化 settings.plugins.tab 贡献；“插件”分区…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-conversation": {
+				"d": "会话领域：骨架（标题栏／标签页／编辑器／空状态）、聊天视图（分组步骤摘要流、流式尾部隔离与轮次状态）、编辑器 dock（与输入区一同 stick…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-ui-tool": {
+				"d": "Client 工具展示插件。ui-conversation 通过 conversation.chat.node 的匹配 key 分发每个已排序的…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-cordis": {
+				"d": "Cordis 动态插件的浏览器半：一个覆盖整个框架的面板，操作 host 持有的全部定义；以及一张只读的 cordis_define 卡片，记录…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-workflow-run": {
+				"d": "这个浏览器插件把持久化的顶层工作流运行重建为独立 Chat 节点。它消费由 dsh-tool-workflow 拥有的四类 tool-workf…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-deliverables": {
+				"d": "产出文件与可点击文件引用功能的属主。Node 侧向系统提示词 registry 注册最终回复指引；浏览器侧把已完成轮次末尾的产出文件行注册到 c…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-workspace": {
+				"d": "共享 Workspace 浏览器与选择器插件。WorkspaceBrowser 填充侧边栏的 sidebar.workspaces slot，W…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-client-ui-input-trigger": {
+				"d": "输入触发流水线插件：光标处的 / 与 @ 检测（词边界 + guard tier 规则）、分组候选菜单，以及把 pick 路由到已注册 sour…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-commands": {
+				"d": "客户端命令 API（ctx.commandUi）：以会话为 key 的命令目录缓存、带 matchSpace／matchEnter 决策钩子的 …",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-skill": {
+				"d": "skill（技能）调用 source 的浏览器端：把 / 触发的 skill source 注册进 ctx.inputTriggers。普通会话…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-subagent": {
+				"d": "Web subagent 功能 owner：向 conversation.session.header.actions 贡献可懒加载展开的目录树…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-jobs": {
+				"d": "Web 后台任务特性的归属方：向 conversation.session.header.actions 贡献一个条目，列出当前会话可见的 ct…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-goal": {
+				"d": "Goal 界面插件（浏览器端部分）：GoalBar 条带是 conversation.input.dock composer 上下文堆栈中的第二…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-message-feedback": {
+				"d": "单条消息反馈插件的浏览器侧：一对 Like/Dislike 按钮加一个可选备注，作为 conversation.chat.assistant-a…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-model-selection": {
+				"d": "模型选择插件（浏览器侧）：两个入口共用一份会话级目录，由 ModelDirectoryResolver（ctx.modelDirectories…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-permission-presets": {
+				"d": "面向两种不同生命周期的浏览器权限界面。「通用」设置行读取显式暴露的 permission Settings 描述符，从 host 的动态 def…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-agent-preset": {
+				"d": "agent preset 的各个表层：General 设置中的一行，用于选择新建会话据以组装的 preset；新建会话界面上的一枚 chip，用…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-settings-plugins": {
+				"d": "插件设置分区及其插件配置标签页。该分区拥有标题与紧凑的标签栏；功能插件通过 settings.plugins.tab 贡献页面。本包自己的标签页…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-plan": {
+				"d": "Plan mode 状态徽章，纯浏览器 surface 插件。浏览器侧占用会话声明的 conversation.input.plan 单实例 s…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-user-questions": {
+				"d": "Web 提问功能插件：其浏览器侧把 question 条目注册到会话拥有的 conversation.composer 键控 slot 中。其主…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-client-ui-trajectory": {
+				"d": "Trajectory 渲染按轮次组织的事件记录表，其中可选择用户、助手、工具和嵌套子工具记录。较粗的分割线标示轮次边界，紧凑的行内标记标识步骤，…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-agent-presets": {
+				"d": "按 preset 组装 agent（智能体）。preset 是一个目录，其中放置一份 agent.cordis.yml；roster 在整个进程…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-persona": {
+				"d": "把 agent（智能体）人设做成一个可组装的行：它既可以遮蔽部署级人设，也可以拥有完整系统提示词。",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-agent-instructions": {
+				"d": "为每个会话加载与 AGENTS.md 兼容的工作区指令文件。该插件会将初始的用户全局指令与项目指令链注入持久历史，随后发现嵌套文件，并在成功的文…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-tool-pwsh": {
+				"d": "注册在 ctx.shell 执行器 seam 之上的面向模型的 pwsh 工具。面向由 PowerShell 执行器（如 @deepseek-a…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-fs": {
+				"d": "面向模型的文件系统工具（read、read_image、write、edit）及其执行器。这是文件系统栈的消费方层：拥有工具名称、JSON Sc…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-fs-search": {
+				"d": "面向模型的文件系统发现工具（glob、grep）由 打包的 ripgrep 二进制（@vscode/ripgrep）支持，而不是由 ctx.fs…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-jobs": {
+				"d": "ctx.jobs 的面向模型控制器：三个与 kind 无关的工具、完成通知和一个后台工作提示词区段。加载该插件会附加 ctx.jobs.star…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-goal": {
+				"d": "所有调用都互斥，因此模型排序的批次能观察到更早变更及其新 revision。UI 客户端会收到纯通用卡片：get_goal 使用 read，变更…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-ask-user": {
+				"d": "模型侧 ask_user_question 工具，基于 ctx.userQuestions 实现。当模型需要确认、选择结果或缺失的信息才能继续时…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-todo": {
+				"d": "面向模型的 todo_write 工具：agent（智能体）的完整任务列表，每次调用都会整体替换。",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-web": {
+				"d": "面向模型的 web 工具套件 web_search 与 web_fetch，构建于 web 能力 seam（ctx.web）之上。它只负责面向模…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-cordis": {
+				"d": "自引用 Cordis 工具集：五个面向模型的工具，操作当前 DSH 进程中的实时运行时。注册表、vm 沙箱与浏览器广播属于 @deepseek-…",
+				"c": "core"
+			},
+			"@deepseek-ai/dsh-skill-filesystem": {
+				"d": "ctx.skills 注册表的本地文件系统提供方。",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-skill": {
+				"d": "面向模型的 skill（技能）目录和 skill 工具。",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-plan-mode": {
+				"d": "按 agent（智能体）分别记录到日志的 plan 协作状态，提供由部署方配置的引导内容、用于直接进入的 /plan [message] 命令、…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-compaction-basic": {
+				"d": "基础压缩（compaction）后端：BasicCompactionEngine 实现 @deepseek-ai/dsh-compaction …",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-command-compact": {
+				"d": "通过 ctx.compaction 提供面向用户的 /compact 压缩（compaction）控制。该插件通过 ctx.commands 注…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-compaction-tool-result-pruner": {
+				"d": "可安全回放、不依赖模型的剪枝服务（ctx.toolResultPruner）。它会将超出预算的 tool/result 表层节点改写为长度受限的…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-subagent-control": {
+				"d": "可选的全局具名 send_message、interrupt_agent 与 list_agents 工具是 ctx.subagents 之上的…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-subagent-control/list-agents": {
+				"d": "可选的全局具名 send_message、interrupt_agent 与 list_agents 工具是 ctx.subagents 之上的…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-subagent": {
+				"d": "基于一个已配置 ctx.subagents 提供方、面向模型的委派工具。更换提供方只会改变传输，不会改变执行约定。",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-workflow-worker-thread": {
+				"d": "本包为 WorkflowEngine 提供实现，每次运行使用一个 Node worker thread。worker 执行编排脚本；子 agen…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-workflow": {
+				"d": "面向模型的 workflow 工具：运行一段扇出 subagent 的 JavaScript 编排脚本，并返回脚本的最终值。本包负责基于 ctx…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-ralph": {
+				"d": "面向模型的 ralph 工具运行固定的前台工作流，把一个不可变目标依次交给多个全新子 agent（智能体）。它展示如何把专用编排策略实现为基于 …",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-mcp-client": {
+				"d": "MCP 客户端桥接插件：连接外部 Model Context Protocol 服务器，把它们的工具注册到 ctx.tools，使模型能够通过服…",
+				"c": "user"
+			},
+			"dsh-overlay-panel": {
+				"d": "DSH Web 的自有界面插件：悬浮工具面板「工具坞」——多视图（token 统计 / 插件列表）。",
+				"c": "user"
+			},
+			"@deepseek-ai/dsh-host-directory-picker-native": {
+				"d": "双面包：浏览器端（./client）向 ui-workspace 的两个目录流 slot 注册一个无渲染的流程占用者——每次 open 请求驱动…",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-client-ui-directory-picker-native": {
+				"d": "原生目录选择界面：原生选取交互的浏览器半边。它通过 ui-workspace 的两个 directory-flow 洞（conversation…",
+				"c": "feature"
+			},
+			"@deepseek-ai/cordis-plugin-hmr": {
+				"d": "Hot module replacement for loader-managed Cordis plugins.",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-bash-sandbox": {
+				"d": "这是使用沙箱能力的 @deepseek-ai/dsh-shell 执行器 seam 的 Service Provider。加载它时，应用它替代 …",
+				"c": "unknown"
+			},
+			"@deepseek-ai/dsh-tool-bash": {
+				"d": "模型侧 bash 工具，注册在 ctx.shell 执行器 seam 上。前台执行始终位于该 seam 之后；后台进程句柄会注册到通用 ctx.…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-skill-badge": {
+				"d": "可选的内置 skill（技能）提供方，向 ctx.skills 贡献 dsh-badge。该 skill 提供官方「powered by dsh…",
+				"c": "feature"
+			},
+			"@deepseek-ai/dsh-tool-str-replace-editor": {
+				"d": "基于 ctx.fs、面向模型的独立 str_replace_editor。它可与持久 Bash、一次性 Bash、沙箱 Bash 或其他终端接口…",
+				"c": "feature"
+			}
+		});
+		/** 出厂基础层 dsh-base 的行 id 集（entryId 为 include:<id>）。 */
+		const PLUGIN_SOURCE_BASE = Object.freeze(["timer","hmr","llm","session","typert","typert-loader","typert-gateway","session-title","session-title-llm","user-questions","agent","agent-default-model","jobs","llm-retry","settings","credentials","llm-pi-ai","session-persistence-jsonl","attachment-local","session-query-sqlite","session-projection","session-telemetry-otel","subprocess","sandbox","sandbox-policy","bash-sandbox","pwsh-sandbox","approval","permission","shell-env","tool-bash","tool-pwsh","tool-jobs","fs-observation-policy","tool-fs","tool-fs-search","agent-instructions","skill","skill-filesystem","skill-badge","tool-skill","commands","command-feedback","goal","goal-round-driver","command-goal","plan-mode","token-meter","compaction-basic","command-compact","subagent","subagent-spawn-in-process","subagent-fork-in-process","tool-subagent-control","tool-subagent-list-agents","tool-subagent","tool-subagent-fork","tool-subagent-report","workflow-worker-thread","tool-workflow","timeout-policy","spill-local","spill-policy","session-checkpoint-policy","tool-result-pruner","tool-todo","tool-goal","tool-ralph","tool-str-replace-editor","repeat-tool-reminder","web","web-search-deepseek","tool-web","tools","system-prompt","agent-loop","fs-sandbox","llm-deepseek"]);
+		/** 出厂 Web 层 dsh-web-app 的行 id 集。 */
+		const PLUGIN_SOURCE_WEB = Object.freeze(["system-prompt","tools","code-runtime","storage","storage-json","storage-domain","message-feedback","session-log-download","workspace","session-projection-cache","session-stats","directory-picker","plugin-inventory","api-gateway","cordis-host-runner","web-startup","webserver","web-runtime","client-hmr","modules","connection","api-remotes","client-runtime","cordis-client-runner","ui-theme","locale","ui-layout","ui-sidebar","ui-settings","ui-settings-general","ui-settings-models","ui-settings-plugin-inventory","ui-conversation","ui-tool","ui-cordis","ui-workflow-run","ui-deliverables","ui-workspace","ui-input-trigger","ui-commands","ui-skill","ui-subagent","ui-jobs","ui-goal","ui-message-feedback","ui-model-selection","ui-permission","ui-agent-preset","ui-settings-plugins","ui-plan","ui-user-questions","ui-trajectory","tool-bash","tool-pwsh","tool-jobs","tool-fs","tool-fs-search","tool-str-replace-editor","skill-filesystem","tool-skill","tool-goal","plan-mode","compaction-basic","command-compact","tool-result-pruner","tool-subagent-control","tool-subagent-list-agents","tool-subagent","tool-subagent-fork","workflow-worker-thread","tool-workflow","tool-ralph","agent-instructions","tool-todo","tool-web","agent-presets","hmr","session-query-sqlite"]);
+
 		const K_OPEN = "dsh-overlay-panel.open";
 		const K_POS = "dsh-overlay-panel.pos";
 		const K_FAB_LEGACY = "dsh-overlay-panel.fabPos";
@@ -225,6 +778,20 @@ window.__ModuleLoader__.load({
 .dop-phase-failed { background: oklch(0.94 0.04 25); color: oklch(0.48 0.14 25); }
 .dop-phase-busy { background: oklch(0.94 0.05 80); color: oklch(0.48 0.11 80); }
 .dop-phase-off { background: oklch(0.94 0.01 260); color: oklch(0.55 0.02 260); }
+
+.dop-filter { flex: none; padding: 0 14px 6px; }
+.dop-filter input {
+	width: 100%; box-sizing: border-box; border: 1px solid oklch(0.90 0.02 260);
+	border-radius: 8px; padding: 4px 9px; font: inherit; font-size: 12px;
+	background: oklch(0.98 0.01 260); color: inherit;
+}
+.dop-filter input::placeholder { color: oklch(0.68 0.02 260); }
+.dop-filter input:focus { outline: 2px solid oklch(0.60 0.17 260); outline-offset: -1px; border-color: transparent; }
+
+.dop-plugin-detail { padding: 2px 6px 8px 24px; font-size: 11.5px; line-height: 1.55; }
+.dop-plugin-desc { margin: 0 0 4px; color: oklch(0.42 0.03 260); }
+.dop-plugin-kv { margin: 0; color: oklch(0.55 0.03 260); }
+.dop-plugin-module { font-size: 10.5px; word-break: break-all; color: oklch(0.60 0.03 260); }
 .dop-empty { margin: 4px 14px 10px; font-size: 12px; color: oklch(0.55 0.03 260); }
 
 @media (prefers-color-scheme: dark) {
@@ -273,6 +840,11 @@ window.__ModuleLoader__.load({
 	.dop-phase-failed { background: oklch(0.34 0.05 25); color: oklch(0.80 0.10 25); }
 	.dop-phase-busy { background: oklch(0.34 0.05 80); color: oklch(0.80 0.10 80); }
 	.dop-phase-off { background: oklch(0.32 0.02 260); color: oklch(0.65 0.02 260); }
+	.dop-filter input { background: oklch(0.20 0.015 260); border-color: oklch(0.35 0.02 260); color: oklch(0.92 0.02 260); }
+	.dop-filter input::placeholder { color: oklch(0.55 0.02 260); }
+	.dop-plugin-desc { color: oklch(0.78 0.02 260); }
+	.dop-plugin-kv { color: oklch(0.62 0.02 260); }
+	.dop-plugin-module { color: oklch(0.58 0.02 260); }
 	.dop-rank-scroll { scrollbar-color: oklch(0.48 0.03 260 / 0.55) transparent; }
 	.dop-rank-scroll::-webkit-scrollbar-thumb { background: oklch(0.48 0.03 260 / 0.55); }
 	.dop-rank-scroll:hover::-webkit-scrollbar-thumb { background: oklch(0.58 0.04 260 / 0.75); }
@@ -768,14 +1340,77 @@ window.__ModuleLoader__.load({
 			return { label: "未运行", cls: "dop-phase-off" };
 		}
 
+		/** 条目来源判定：本机 patch 自加 vs 出厂组合（按 bundle 行归属细分到层）。 */
+		const USER_PATCH_ENTRY_IDS = new Set(["include:overlay-panel", "include:mcp-cocos", "include:mcp-project-memory-manager"]);
+		const BASE_ROW_SET = new Set(PLUGIN_SOURCE_BASE);
+		const WEB_ROW_SET = new Set(PLUGIN_SOURCE_WEB);
+		function sourceOf(entryId) {
+			if (USER_PATCH_ENTRY_IDS.has(entryId)) return { kind: "user", label: "本机自加 · cordis.patch.yml" };
+			if (entryId === "include") return { kind: "base", label: "出厂组合 · 批量挂载器" };
+			if (entryId.startsWith("include:")) {
+				const row = entryId.slice("include:".length);
+				if (BASE_ROW_SET.has(row)) return { kind: "base", label: "出厂组合 · 基础层 dsh-base" };
+				if (WEB_ROW_SET.has(row)) return { kind: "base", label: "出厂组合 · Web 层 dsh-web-app" };
+				return { kind: "base", label: "出厂组合" };
+			}
+			return { kind: "base", label: "出厂组合" };
+		}
+		/** 可关闭性说明（生成数据的 c 字段 → 面向用户的建议文案）。 */
+		const CLOSABILITY_TEXT = {
+			user: "可自由关闭：在 cordis.patch.yml 删除或禁用对应行后生效",
+			core: "不建议关闭：核心运行时，关闭会导致宿主或会话不可用",
+			feature: "可关闭：对应功能随之消失，不影响其它插件",
+			unknown: "不确定：建议先确认依赖关系再决定"
+		};
+
+		/** 单个组合插件行：可展开详情（用途 / 来源 / 能否关闭 / 模块）。 */
+		function PluginRow(props) {
+			const { entry, expanded, onToggle } = props;
+			const badge = phaseBadgeOf(entry.fiberPhase, entry.enabled);
+			const doc = PLUGIN_DOCS[entry.moduleName];
+			const source = sourceOf(entry.entryId);
+			return h("div", null,
+				h("button", {
+					type: "button",
+					className: "dop-session dop-session-clickable",
+					onClick: onToggle,
+					"aria-expanded": String(expanded),
+					title: entry.moduleName
+				},
+					h("span", { className: "dop-chev" + (expanded ? " dop-chev-open" : "") }, h(ChevronIcon)),
+					h("span", { className: "dop-plugin-name" }, entry.entryId),
+					h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
+				),
+				expanded
+					? h("div", { className: "dop-plugin-detail" },
+						h("p", { className: "dop-plugin-desc" }, doc?.d || "暂无说明（未收录该模块的简介）。"),
+						h("p", { className: "dop-plugin-kv" }, `来源：${source.label}`),
+						h("p", { className: "dop-plugin-kv" }, `能否关闭：${CLOSABILITY_TEXT[doc?.c ?? "unknown"]}`),
+						h("p", { className: "dop-plugin-kv dop-plugin-module" }, `模块：${entry.moduleName}`)
+					)
+					: null
+			);
+		}
+
 		/**
 		 * 插件列表视图：宿主组合插件（pluginInventory Remote）+ 本进程动态插件
 		 * （dynamicCordisRunner Remote）。两个 Remote 都只表示调用当下，进入视图
-		 * 懒加载，顶栏刷新按钮手动重拉。
+		 * 懒加载，顶栏刷新按钮手动重拉。组合插件按 需要关注 / 本机自加 / 出厂组合
+		 * 分区，行可展开查看用途、来源与能否关闭。
 		 */
 		function PluginListView(props) {
 			const [tick, setTick] = useState(0);
 			const [state, setState] = useState({ phase: "loading", error: null, staticEntries: [], dynamicRows: [] });
+			const [query, setQuery] = useState("");
+			const [expanded, setExpanded] = useState(() => new Set());
+			const toggleExpanded = (id) => {
+				setExpanded((prev) => {
+					const next = new Set(prev);
+					if (next.has(id)) next.delete(id);
+					else next.add(id);
+					return next;
+				});
+			};
 			useEffect(() => {
 				let alive = true;
 				setState((s) => ({ ...s, phase: "loading" }));
@@ -804,11 +1439,36 @@ window.__ModuleLoader__.load({
 				return () => { alive = false; };
 			}, [tick, props.pluginInventory, props.dynamicRunner]);
 
-			// 失败优先，其次保持 Loader 顺序（sort 稳定）；已禁用沉底。
-			const staticEntries = useMemo(() => {
-				const weight = (e) => (e.fiberPhase === "failed" ? 0 : e.enabled === false ? 2 : 1);
-				return [...state.staticEntries].sort((a, b) => weight(a) - weight(b));
-			}, [state.staticEntries]);
+			// 过滤：命中 entryId / 模块名 / 用途简介任意一处。
+			const q = query.trim().toLowerCase();
+			const matchStatic = (e) => {
+				if (!q) return true;
+				const doc = PLUGIN_DOCS[e.moduleName];
+				return e.entryId.toLowerCase().includes(q)
+					|| e.moduleName.toLowerCase().includes(q)
+					|| (doc?.d ?? "").toLowerCase().includes(q);
+			};
+			const visible = state.staticEntries.filter(matchStatic);
+			// 失败（fiberPhase=failed）才是真正异常；已禁用多为出厂 patch 的有意关闭，中性呈现。
+			const failedRows = visible.filter((e) => e.fiberPhase === "failed");
+			const disabledRows = visible.filter((e) => e.fiberPhase !== "failed" && e.enabled === false);
+			const isSpecial = (e) => e.fiberPhase === "failed" || e.enabled === false;
+			const userRows = visible.filter((e) => !isSpecial(e) && sourceOf(e.entryId).kind === "user");
+			const baseRows = visible.filter((e) => !isSpecial(e) && sourceOf(e.entryId).kind !== "user");
+			const dynamicRows = state.dynamicRows.filter((r) => !q || r.pluginId.toLowerCase().includes(q));
+
+			const renderSection = (title, rows) =>
+				rows.length === 0
+					? null
+					: h(React.Fragment, null,
+						h("p", { className: "dop-plugin-subhead" }, `${title} ${rows.length}`),
+						rows.map((e) => h(PluginRow, {
+							key: e.entryId,
+							entry: e,
+							expanded: expanded.has(e.entryId),
+							onToggle: () => toggleExpanded(e.entryId)
+						}))
+					);
 
 			return h(React.Fragment, null,
 				h("div", { className: "dop-plugin-topbar" },
@@ -821,37 +1481,48 @@ window.__ModuleLoader__.load({
 						onClick: () => setTick((t) => t + 1)
 					}, h(RefreshIcon))
 				),
+				h("div", { className: "dop-filter" },
+					h("input", {
+						type: "search",
+						value: query,
+						placeholder: "按名称、模块或用途过滤…",
+						"aria-label": "过滤插件",
+						onChange: (e) => setQuery(e.target.value)
+					})
+				),
 				h("div", { className: "dop-rank-scroll" },
 					state.phase === "loading" && state.staticEntries.length === 0
 						? h("p", { className: "dop-desc", style: { margin: "0" } }, "正在读取插件清单…")
 						: h(React.Fragment, null,
 							state.error ? h("p", { className: "dop-empty", style: { margin: "0 0 8px" } }, state.error) : null,
-							h("p", { className: "dop-plugin-subhead" }, `组合插件 ${staticEntries.length}`),
-							staticEntries.map((e) => {
-								const badge = phaseBadgeOf(e.fiberPhase, e.enabled);
-								return h("div", { className: "dop-session", key: e.entryId, title: e.moduleName },
-									h("span", { className: "dop-plugin-name" }, e.entryId),
-									h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
-								);
-							}),
-							h("p", { className: "dop-plugin-subhead" }, `动态插件 ${state.dynamicRows.length}`),
-							state.dynamicRows.length === 0
-								? h("p", { className: "dop-empty", style: { margin: "0" } }, "当前进程没有动态插件。")
-								: state.dynamicRows.map((row) => {
-									const badge = dynamicBadgeOf(row);
-									return h("div", {
-										className: "dop-session",
-										key: row.pluginId,
-										title: `所属会话 ${row.agentId}\n当前版本 ${row.currentPackageId ?? "—"}`
-									},
-										h("span", { className: "dop-plugin-name" }, row.pluginId),
-										h("span", { className: "dop-plugin-meta" }, `${row.packages.length} 个版本`),
-										h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
-									);
-								})
+							visible.length === 0
+								? h("p", { className: "dop-empty", style: { margin: "0" } }, "没有匹配的插件。")
+								: h(React.Fragment, null,
+									renderSection("失败", failedRows),
+									renderSection("已禁用", disabledRows),
+									renderSection("本机自加", userRows),
+									renderSection("出厂组合", baseRows)
+								),
+							dynamicRows.length > 0
+								? h(React.Fragment, null,
+									h("p", { className: "dop-plugin-subhead" }, `动态插件 ${dynamicRows.length}`),
+									dynamicRows.map((row) => {
+										const badge = dynamicBadgeOf(row);
+										return h("div", {
+											className: "dop-session",
+											key: row.pluginId,
+											title: `所属会话 ${row.agentId}\n当前版本 ${row.currentPackageId ?? "—"}`
+										},
+											h("span", { className: "dop-plugin-name" }, row.pluginId),
+											h("span", { className: "dop-plugin-meta" }, `${row.packages.length} 个版本`),
+											h("span", { className: `dop-phase ${badge.cls}` }, badge.label)
+										);
+									})
+								)
+								: null
 						)
 				),
-				h("p", { className: "dop-footer" }, `${staticEntries.length} 个组合插件 · ${state.dynamicRows.length} 个动态插件`)
+				h("p", { className: "dop-footer" }, `${state.staticEntries.length} 个组合插件 · ${state.dynamicRows.length} 个动态插件`)
 			);
 		}
 
